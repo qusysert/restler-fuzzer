@@ -42,6 +42,33 @@ module Dependencies =
             dependencies, unresolvedPathDeps
 
 
+        [<Theory>]
+        [<InlineData(true)>]
+        [<InlineData(false)>]
+        let ``external DELETE response annotations preserve inline behavior`` (useBodyExamples:bool) =
+            let fixtureDirectory = Path.Combine(Environment.CurrentDirectory, "swagger", "dependencyTests", "external_delete_response")
+            let compile spec annotation outputDirectory =
+                let config = { Restler.Config.SampleConfig with
+                                 IncludeOptionalParameters = true
+                                 ResolveBodyDependencies = true
+                                 UseBodyExamples = Some useBodyExamples
+                                 UseAllExamplePayloads = Some true
+                                 SwaggerSpecFilePath = Some [Path.Combine(fixtureDirectory, spec)]
+                                 AnnotationFilePath = annotation
+                                 GrammarOutputDirectoryPath = Some outputDirectory
+                             }
+                Restler.Workflow.generateRestlerGrammar config
+            let inlineDirectory = Path.Combine(ctx.testRootDirPath, "inline")
+            let externalDirectory = Path.Combine(ctx.testRootDirPath, "external")
+            compile "inline.json" None inlineDirectory
+            compile "external.json" (Some (Path.Combine(fixtureDirectory, "annotations.json"))) externalDirectory
+            for fileName in ["grammar.py"; "grammar.json"; "dict.json"; "dependencies.json"; "unresolved_dependencies.json"] do
+                let expected = File.ReadAllText(Path.Combine(inlineDirectory, fileName))
+                let actual = File.ReadAllText(Path.Combine(externalDirectory, fileName))
+                Assert.True((expected = actual), sprintf "External annotation changed %s" fileName)
+            let grammar = File.ReadAllText(Path.Combine(externalDirectory, "grammar.py"))
+            Assert.Contains("_items_post_0_id.reader()", grammar)
+
         [<Fact>]
         let ``demo_server path dependencies resolved without annotations`` () =
             let config = configs.["demo_server"]

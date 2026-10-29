@@ -22,7 +22,10 @@
     <Compile Include="RealWorldTests.fs" />
 	  <Content Include="packages.lock.json" />
 
-	  <Content Include="swagger\example_config_file.json">
+	  <Content Include="swagger\dependencyTests\external_delete_response\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="swagger\example_config_file.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="swagger\exactCopy\array_example.json">
