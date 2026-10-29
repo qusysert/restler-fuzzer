@@ -1261,6 +1261,9 @@ class ParamBoolean(ParamValue):
         @rtype : List[str]
 
         """
+        if self.is_dynamic_object_reader:
+            return self.get_dynamic_object()
+
         # default value
         default_value = config.get_default_value(
             self.tag, primitives.FUZZABLE_BOOL
