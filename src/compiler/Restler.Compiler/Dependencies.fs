@@ -1342,12 +1342,34 @@ let extractDependencies (requestData:(RequestId*RequestData)[])
                             )
                 )
 
-    // Also check for input-only producers that should be added for this request.
-    // At this time, only producers specified in annotations are supported.
-    // Find the corresponding parameter and add it as a producer.
+    // Operation-local DELETE annotations do not register input writers. Preserve
+    // that behavior for global DELETE response bindings; genuine input-only
+    // bindings still need their writer when no matching response producer exists.
+    let hasResponseProducer (a:ProducerConsumerAnnotation) =
+        match a.producerParameter with
+        | None -> false
+        | Some parameter ->
+            let name =
+                match parameter with
+                | ResourceName name -> Some name
+                | ResourcePath path -> path.getNamePart()
+            match name with
+            | None -> false
+            | Some name ->
+                producers.getIndexedByEndpointProducers(name, a.producerId.endpoint, [a.producerId.method])
+                |> Seq.exists (fun p ->
+                    p.id.RequestId = a.producerId &&
+                    match parameter with
+                    | ResourceName name -> p.id.ResourceName = name
+                    | ResourcePath path -> p.id.AccessPathParts = path)
+
     globalAnnotations
     |> Seq.iter (fun a ->
-                    if a.producerParameter.IsSome then
+                    let isDeleteResponseBinding =
+                        match a.consumerId with
+                        | Some consumer when consumer.method = OperationMethod.Delete -> hasResponseProducer a
+                        | _ -> false
+                    if a.producerParameter.IsSome && not isDeleteResponseBinding then
                         let ip = createInputOnlyProducerFromAnnotation a pathConsumers queryConsumers bodyConsumers headerConsumers
                         if ip.IsSome then
                             let resourceName, producer = ip.Value
