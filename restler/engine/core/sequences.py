@@ -9,6 +9,9 @@ import copy
 import time
 import json
 import datetime
+import gzip
+import os
+import tempfile
 from enum import Enum
 
 import engine.core.async_request_utilities as async_request_utilities
@@ -45,6 +48,33 @@ class SentRequestData(object):
         self.producer_timing_delay = producer_timing_delay
         self.max_async_wait_time = max_async_wait_time
         self.replay_blocks = replay_blocks
+
+    @property
+    def response(self):
+        # Do not cache the loaded body: BFS and bug buckets retain this record.
+        if self._response_file is not None:
+            with gzip.open(self._response_file, "rt", encoding="utf-8",
+                           errors="surrogatepass", newline="") as stream:
+                return stream.read()
+        return self._response
+
+    @response.setter
+    def response(self, value):
+        response_file = None
+        if isinstance(value, str) and sys.getsizeof(value) > 64 * 1024:
+            directory = os.path.abspath(os.path.join(logger.LOGS_DIR or os.getcwd(), "response_bodies"))
+            os.makedirs(directory, mode=0o700, exist_ok=True)
+            fd, response_file = tempfile.mkstemp(prefix="response-", suffix=".txt.gz", dir=directory)
+            try:
+                with os.fdopen(fd, "wb") as raw:
+                    with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=1, mtime=0) as stream:
+                        for offset in range(0, len(value), 64 * 1024):
+                            stream.write(value[offset:offset + 64 * 1024].encode("utf-8", "surrogatepass"))
+            except BaseException:
+                os.unlink(response_file)
+                raise
+        self._response = value if response_file is None else None
+        self._response_file = response_file
 
     def find_matching_request(self, requests):
         """ Find the request in the given list of requests that corresponds to this SentRequestData"""

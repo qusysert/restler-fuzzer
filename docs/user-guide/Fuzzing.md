@@ -58,3 +58,22 @@ which will include a new file for each unique bug found.
 This log displays the actual request strings sent to the server as part of the sequence.
 These logs are replayable with RESTler using its Replay functionality.
 See [BugBuckets](BugBuckets.md) for a more details on bug buckets, and [Replay](Replay.md) for how to reproduce the bugs.
+
+## Large response histories
+
+Sequence history stores response strings larger than 64 KiB of Python memory as
+lossless gzip files in the experiment's `logs/response_bodies` directory. Small
+responses remain in memory. Parsers and checkers still receive the complete live
+response; bug reports and replay read complete archived responses when needed.
+Reading an archive does not cache its full body in sequence history.
+
+Keep the response archive directory with saved experiment results and checkpoints.
+History records reference absolute paths, so moving an experiment requires keeping
+those paths available. Resuming checkpoints made by an earlier engine without this
+storage format is not supported. Archives are retained until the experiment is
+removed; they are not deleted when individual sequences leave memory.
+
+This trades retained response memory for disk space and compression/read work.
+Network logs still contain full responses. An archive write failure is reported
+as an error rather than silently retaining a large response in memory. The change
+does not bound sequence counts, working parser memory or total campaign memory.
